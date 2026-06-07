@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='custom.css') }}" rel="stylesheet">
+
+    <!-- Chart.js for beautiful analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #0f172a;
+        }
+        .table td, .table th {
+            vertical-align: middle;
+        }
+        .table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #0d0f12 !important;
+            border-right: 1px solid #1f2937;
+            position: fixed;
+            height: 100vh;
+            z-index: 1000;
+        }
+        .sidebar .nav-link {
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 10px 16px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+        .sidebar .nav-link:hover {
+            color: #f1f5f9 !important;
+            background-color: #1e293b !important;
+        }
+        .sidebar .nav-link.active {
+            color: #ffffff !important;
+            background: #1e293b !important;
+            border-left: 3px solid #10b981;
+            border-radius: 4px 8px 8px 4px;
+            font-weight: 600;
+        }
+        .sidebar .nav-link.active i {
+            color: #10b981 !important;
+        }
+        .main-content {
+            margin-left: 250px;
+            background-color: #f8fafc;
+            min-height: 100vh;
+        }
+        .card {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+        }
+        .dashboard-section {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="d-flex" style="min-height: 100vh;">
+    
+    <!-- ================= SIDEBAR ================= -->
+    <div class="sidebar d-flex flex-column justify-content-between text-white">
+        <div class="d-flex flex-column">
+            <!-- Sidebar Header -->
+            <div class="sidebar-header d-flex align-items-center p-4" style="border-bottom: 1px solid #1f2937;">
+                <img src="{{ url_for('static', filename='img1.jpg') }}" alt="PMS Logo" width="40" height="40" class="me-3 rounded bg-white p-1 shadow-sm">
+                <div>
+                    <div class="fw-bold" style="font-size: 16px; letter-spacing: 0.5px;">PMS</div>
+                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Employee Console</div>
+                </div>
+            </div>
+            
+            <!-- Navigation Links -->
+            <ul class="nav flex-column p-3 gap-1">
+                <li class="nav-item">
+                    <a href="#dashboard" class="nav-link active d-flex align-items-center" onclick="showSection('dashboard'); event.preventDefault();">
+                        <i class="fa-solid fa-chart-pie me-3" style="width: 20px;"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#propose-goal" class="nav-link d-flex align-items-center" onclick="showSection('propose-goal'); event.preventDefault();">
+                        <i class="fa-solid fa-circle-plus me-3" style="width: 20px;"></i> Propose Goal
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#my-goals" class="nav-link d-flex align-items-center" onclick="showSection('my-goals'); event.preventDefault();">
+                        <i class="fa-solid fa-bullseye me-3" style="width: 20px;"></i> My Goals & Feedback
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#probation" class="nav-link d-flex align-items-center" onclick="showSection('probation'); event.preventDefault();">
+                        <i class="fa-solid fa-user-clock me-3" style="width: 20px;"></i> Probation Review
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#cycles" class="nav-link d-flex align-items-center" onclick="showSection('cycles'); event.preventDefault();">
+                        <i class="fa-solid fa-arrows-rotate me-3" style="width: 20px;"></i> Cycle Reviews
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#escalations" class="nav-link d-flex align-items-center" onclick="showSection('escalations'); event.preventDefault();">
+                        <i class="fa-solid fa-triangle-exclamation me-3" style="width: 20px;"></i> Escalation Alerts
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer p-3" style="border-top: 1px solid #1f2937;">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="avatar d-flex align-items-center justify-content-center text-white fw-bold bg-success rounded-circle" style="width: 38px; height: 38px; font-size: 14px;">
+                        {{ session['name'][0]|upper if session['name'] else 'E' }}
+                    </div>
+                    <div style="line-height: 1.2;">
+                        <div class="fw-semibold text-white" style="font-size: 13px;">{{ session['name'] or 'Employee' }}</div>
+                        <div class="text-muted" style="font-size: 11px;">{{ session['email'] or 'employee@example.com' }}</div>
+                    </div>
+                </div>
+                <a href="/logout" class="text-danger p-2" title="Logout">
+                    <i class="fa-solid fa-right-from-bracket" style="font-size: 16px;"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MAIN CONTENT ================= -->
+    <div class="main-content flex-grow-1">
+        
+        <!-- Top Nav Header -->
+        <div class="top-nav d-flex align-items-center justify-content-between px-4 py-3 bg-white border-bottom" style="height: 70px;">
+            <div>
+                <span class="text-muted small text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Employee Console</span>
+                <h4 class="fw-bold mb-0 text-dark" id="section-title">Dashboard Overview</h4>
+            </div>
+            
+            <div class="d-flex align-items-center gap-3">
+                <!-- Notifications Bell -->
+                <div class="dropdown">
+                    <a href="#" class="btn bg-light position-relative shadow-sm" data-bs-toggle="dropdown" aria-expanded="false" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                        <i class="fa-regular fa-bell" style="font-size: 16px;"></i>
+                        {% if notifications %}
+                        <span class="position-absolute top-0 start-100 translate-middle p-1.5 bg-danger border border-white rounded-circle" style="margin-top: 4px; margin-left: -4px;"></span>
+                        {% endif %}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2 p-0" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header bg-light border-bottom text-dark fw-bold py-2">
+                            <i class="fa-solid fa-envelope-open-text text-primary me-2"></i> Recent Email Alerts
+                        </li>
+                        {% if notifications %}
+                            {% for n in notifications %}
+                            <li class="border-bottom">
+                                <span class="dropdown-item text-wrap py-3" style="font-size: 13px; cursor: default;">
+                                    <div class="fw-bold text-dark mb-1">{{ n[4] }}</div>
+                                    <div class="text-muted small"><i class="fa-regular fa-clock me-1"></i> {{ n[6][:10] }} {{ n[6][11:16] }}</div>
+                                </span>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <li><span class="dropdown-item text-muted small py-4 text-center">No new notifications.</span></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Content Container -->
+        <div class="p-4">
+
+            <!-- ================= SECTION: DASHBOARD (OVERVIEW) ================= -->
+            <div id="section-dashboard" class="dashboard-section" style="display: block;">
+                <!-- Stats Row -->
+                <div class="row g-3 mb-4">
+                    <!-- Total Weight -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Active Weight Assigned</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #ecfdf5; border-radius: 6px; color: #10b981; font-size: 13px;">
+                                    <i class="fa-solid fa-percent"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold mb-1 text-dark">{{ total_weight }}%</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Active Goals -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Active goals</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #eff6ff; border-radius: 6px; color: #3b82f6; font-size: 13px;">
+                                    <i class="fa-solid fa-bullseye"></i>
+                                </div>
+                            </div>
+                            {% set active_g = namespace(val=0) %}
+                            {% for g in goals %}{% if g[5] == 'Active' %}{% set active_g.val = active_g.val + 1 %}{% endif %}{% endfor %}
+                            <h3 class="fw-bold mb-1 text-dark">{{ active_g.val }}</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Proposed / Draft Goals -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Proposed / Draft Goals</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #fffbeb; border-radius: 6px; color: #f59e0b; font-size: 13px;">
+                                    <i class="fa-solid fa-clock"></i>
+                                </div>
+                            </div>
+                            {% set draft_g = namespace(val=0) %}
+                            {% for g in goals %}{% if g[5] in ['Draft', 'Pending Approval'] %}{% set draft_g.val = draft_g.val + 1 %}{% endif %}{% endfor %}
+                            <h3 class="fw-bold mb-1 text-dark">{{ draft_g.val }}</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Active Escalations -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">SLA Alert Breaches</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #fff5f5; border-radius: 6px; color: #ef4444; font-size: 13px;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold mb-1 text-dark">{{ escalations|length }}</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row g-3 mb-4">
+                    <!-- Goals Progress chart -->
+                    <div class="col-md-8">
+                        <div class="card border-0 shadow-sm p-4 bg-white" style="height: 420px;">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div>
+                                    <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">My Goal Progress</h5>
+                                    <span class="text-muted" style="font-size: 12px;">Progress values for proposed & active goals</span>
+                                </div>
+                            </div>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="goalProgressChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Goal Weight Distribution -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm p-4 bg-white" style="height: 420px;">
+                            <h5 class="fw-bold mb-1 text-dark" style="font-size: 16px;">Weight Distribution</h5>
+                            <span class="text-muted d-block mb-3" style="font-size: 12px;">Active weight vs available weight</span>
+                            <div style="position: relative; height: 260px; width: 100%;" class="d-flex align-items-center justify-content-center">
+                                <canvas id="weightStatusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Escalations preview -->
+                <div class="card border-0 shadow-sm p-4 bg-white">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">
+                            <i class="fa-solid fa-bell text-danger me-2"></i> Active SLA Actions <span class="text-muted fw-normal" style="font-size: 14px;">({{ escalations|length }} pending)</span>
+                        </h5>
+                        <a href="#escalations" class="text-primary fw-bold text-decoration-none small" onclick="showSection('escalations')">View all <i class="fa-solid fa-angle-right ms-1"></i></a>
+                    </div>
+                    
+                    {% if escalations %}
+                    <div class="list-group list-group-flush">
+                        {% for e in escalations %}
+                        <div class="list-group-item px-0 py-3 d-flex align-items-center justify-content-between border-bottom border-light">
+                            <div class="d-flex align-items-center">
+                                <div class="dot me-3" style="width: 8px; height: 8px; border-radius: 50%; background-color: #ef4444;"></div>
+                                <div>
+                                    <div class="fw-bold text-dark" style="font-size: 14px;">{{ e.type }}</div>
+                                    <div class="text-muted" style="font-size: 12px;">{{ e.description }}</div>
+                                </div>
+                            </div>
+                            <span class="badge bg-dark rounded-pill px-3">{{ e.action }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="py-4 text-center text-muted small">
+                        No active SLA alerts or escalations.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ================= SECTION: PROPOSE GOAL ================= -->
+            <div id="section-propose-goal" class="dashboard-section">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5 class="mb-3 fw-bold"><i class="fa-solid fa-circle-plus text-primary me-2"></i> Propose Goal</h5>
+                        {% if total_weight >= 100 %}
+                            <div class="alert alert-warning mb-0">
+                                <i class="fa-solid fa-circle-info me-2"></i> You have reached 100% of your goal weight allotment. You cannot submit further proposals.
+                            </div>
+                        {% else %}
+                            <form method="POST" action="/create_goal" class="bg-light p-4 border rounded">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Goal Title</label>
+                                        <input type="text" name="title" class="form-control" placeholder="e.g. Automate API Testing" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Weightage (%) <small class="text-muted">(Max: {{ 100 - total_weight }}%)</small></label>
+                                        <input type="number" name="weightage" class="form-control" placeholder="25" min="1" max="{{ 100 - total_weight }}" required>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label fw-bold">Description & Key Deliverables</label>
+                                        <textarea name="description" class="form-control" rows="3" placeholder="Deliverables..." required></textarea>
+                                    </div>
+                                    <div class="col-md-12 text-end mt-4">
+                                        <button class="btn btn-primary px-5 fw-bold" style="padding: 10px 24px;">Submit Proposal</button>
+                                    </div>
+                                </div>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: MY GOALS & FEEDBACK ================= -->
+            <div id="section-my-goals" class="dashboard-section">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body p-0">
+                        <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-bullseye text-primary me-2"></i> My Goals & Feedback</h5>
+                            <a href="/export_my_goals" class="btn btn-success btn-sm fw-bold"><i class="fa-solid fa-file-csv me-2"></i> Export My Goals CSV</a>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 12%">Code</th>
+                                        <th style="width: 25%">Goal Details</th>
+                                        <th style="width: 10%">Weight</th>
+                                        <th style="width: 23%">Progress</th>
+                                        <th style="width: 30%">Manager Rating & Feedback</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for g in goals %}
+                                    <tr>
+                                        <td class="fw-semibold text-secondary">{{ g[1] }}</td>
+                                        <td>
+                                            <div class="fw-bold text-dark">{{ g[2] }}</div>
+                                            <small class="text-muted">{{ g[3] }}</small>
+                                            <br>
+                                            {% if g[5] == 'Draft' %}
+                                                <span class="badge bg-secondary mt-1">Draft</span>
+                                                <a href="/submit_goal/{{ g[0] }}" class="btn btn-sm btn-primary fw-bold ms-2" style="font-size: 11px; padding: 2px 8px;">Submit for Approval</a>
+                                            {% elif g[5] == 'Pending Approval' %}
+                                                <span class="badge bg-warning text-dark mt-1">Pending Approval</span>
+                                            {% elif g[5] == 'Active' %}
+                                                <span class="badge bg-success mt-1">Active</span>
+                                            {% elif g[5] == 'Completed' %}
+                                                <span class="badge bg-primary mt-1">Completed</span>
+                                            {% elif g[5] == 'Archived' %}
+                                                <span class="badge bg-dark mt-1">Archived</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="fw-bold">{{ g[6] }}%</td>
+                                        <td>
+                                            {% if g[5] == 'Active' %}
+                                                <form method="POST" action="/update_progress/{{ g[0] }}" class="d-flex align-items-center gap-2">
+                                                    <input type="number" name="progress" class="form-control form-control-sm" style="width: 75px;" value="{{ g[7] }}" min="0" max="100" required>
+                                                    <button class="btn btn-sm btn-outline-success fw-bold" type="submit">Update</button>
+                                                </form>
+                                                <div class="progress mt-2" style="height: 4px;">
+                                                    <div class="progress-bar bg-success dynamic-pb" role="progressbar" aria-valuenow="{{ g[7] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                            {% else %}
+                                                <div class="fw-bold text-dark mb-1">{{ g[7] }}%</div>
+                                                <div class="progress" style="height: 4px;">
+                                                    <div class="progress-bar bg-secondary dynamic-pb" role="progressbar" aria-valuenow="{{ g[7] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set ns = namespace(found=false) %}
+                                            {% for f in feedback %}
+                                                {% if f[3] == g[0] %}
+                                                    {% set ns.found = true %}
+                                                    <div class="p-2 bg-light border rounded">
+                                                        <div class="mb-1">
+                                                            {% for i in range(1, 6) %}
+                                                                {% if f[4] >= i %}
+                                                                    <span style="color: #f59e0b; font-size: 14px;">★</span>
+                                                                {% else %}
+                                                                    <span style="color: #cbd5e1; font-size: 14px;">★</span>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </div>
+                                                        <small class="text-dark d-block">{{ f[5] }}</small>
+                                                    </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% if not ns.found %}
+                                                <span class="text-muted small">No feedback submitted.</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-5">No goals found.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: PROBATION ================= -->
+            <div id="section-probation" class="dashboard-section">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-3"><i class="fa-solid fa-user-clock text-primary me-2"></i> Probation Reviews</h5>
+
+                        {% for p, delay in probation_with_delay %}
+                        <div class="card mb-3 border border-light-subtle shadow-sm">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <h6 class="fw-bold text-dark mb-0">Probation Stage: Day {{ p[2] }} Review</h6>
+                                    {% if p[5] == 0 and delay >= 7 %}
+                                        <span class="badge bg-danger"><i class="fa-solid fa-circle-exclamation me-1"></i> Overdue by {{ delay }} days</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if p[5] == 1 %}
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-secondary mb-2">Self Submission (Completed)</h6>
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Comfort</th><td>{{ p[3].comfort }}</td></tr>
+                                                <tr><th>Clarity</th><td>{{ p[3].clarity }}</td></tr>
+                                                <tr><th>Challenges</th><td>{{ p[3].challenges }}</td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-primary mb-2">Manager Feedback</h6>
+                                            {% if p[9] == true %}
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Understanding</th><td>{{ p[4].understanding }}</td></tr>
+                                                <tr><th>Performance</th><td>{{ p[4].performance }}</td></tr>
+                                                <tr><th>Concerns</th><td>{{ p[4].concerns }}</td></tr>
+                                            </table>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-circle-notch fa-spin me-1"></i> Awaiting manager review completion</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <form method="POST" action="/submit_self_review/{{ p[0] }}" class="bg-light p-3 border rounded">
+                                    <h6 class="fw-bold text-dark mb-3">Submit Your Self-Evaluation</h6>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Comfort in Role</label>
+                                        <select name="comfort" class="form-select" required>
+                                            <option value="" disabled selected>Select option</option>
+                                            <option>Good</option>
+                                            <option>Moderate</option>
+                                            <option>Low</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Role Clarity</label>
+                                        <select name="clarity" class="form-select" required>
+                                            <option value="" disabled selected>Select option</option>
+                                            <option>Clear</option>
+                                            <option>Somewhat Clear</option>
+                                            <option>Unclear</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Current Challenges</label>
+                                        <textarea name="challenges" class="form-control" rows="2" placeholder="List any roadblocks..." required></textarea>
+                                    </div>
+
+                                    <button class="btn btn-primary fw-bold px-4" type="submit">Submit Feedback</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: CYCLE REVIEWS ================= -->
+            <div id="section-cycles" class="dashboard-section">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-3"><i class="fa-solid fa-arrows-rotate text-primary me-2"></i> Review Cycles</h5>
+
+                        {% for c in cycles %}
+                        <div class="card mb-3 border border-light-subtle shadow-sm">
+                            <div class="card-body p-3">
+                                <h6 class="fw-bold text-dark mb-1">{{ c[1] }}</h6>
+                                <p class="text-secondary small mb-3"><b>Period:</b> {{ c[4] }} to {{ c[5] }}</p>
+
+                                {% if c[6] == 1 %}
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-secondary mb-2">Self Submission (Completed)</h6>
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Self Rating</th><td><span class="badge bg-secondary">{{ c[8].rating }}</span></td></tr>
+                                                <tr><th>Achievements</th><td>{{ c[8].achievements }}</td></tr>
+                                                <tr><th>Challenges</th><td>{{ c[8].challenges }}</td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-primary mb-2">Manager Evaluation</h6>
+                                            {% if c[12] == true %}
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Manager Rating</th><td><span class="badge bg-primary">{{ c[9].rating }}</span></td></tr>
+                                                <tr><th>Comment</th><td>{{ c[9].comment }}</td></tr>
+                                            </table>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-circle-notch fa-spin me-1"></i> Awaiting manager cycle review</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <form method="POST" action="/submit_cycle_self/{{ c[0] }}" class="bg-light p-3 border rounded">
+                                    <h6 class="fw-bold text-dark mb-3">Submit Self Evaluation</h6>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Performance Rating</label>
+                                        <select name="rating" class="form-select" required>
+                                            <option value="" disabled selected>Select option</option>
+                                            <option>Above Expectations</option>
+                                            <option>Meets Expectations</option>
+                                            <option>Below Expectations</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Key Achievements</label>
+                                        <textarea name="achievements" class="form-control" rows="2" placeholder="List milestones..." required></textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Challenges & Obstacles</label>
+                                        <textarea name="challenges" class="form-control" rows="2" placeholder="Describe difficulties..." required></textarea>
+                                    </div>
+
+                                    <button class="btn btn-primary fw-bold px-4" type="submit">Submit Cycle Review</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: ESCALATIONS ================= -->
+            <div id="section-escalations" class="dashboard-section">
+                <div class="card shadow-sm border border-start border-danger border-4">
+                    <div class="card-body p-4 bg-white rounded-3">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="text-danger me-3"><i class="fa-solid fa-bell fa-2x"></i></div>
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark">URGENT: ACTION REQUIRED ({{ escalations|length }})</h5>
+                                <p class="text-muted small mb-0">The following tasks are overdue and require your immediate attention.</p>
+                            </div>
+                        </div>
+
+                        {% if escalations %}
+                        <div class="table-responsive rounded border mt-3">
+                            <table class="table table-hover mb-0 bg-white align-middle small">
+                                <thead class="table-light text-muted">
+                                    <tr>
+                                        <th class="fw-semibold border-0 py-3 ps-3">Task Type</th>
+                                        <th class="fw-semibold border-0 py-3">Description</th>
+                                        <th class="fw-semibold border-0 py-3 pe-3 text-end">Recommended Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for e in escalations %}
+                                    <tr>
+                                        <td class="fw-bold text-dark ps-3"><i class="fa-solid fa-circle-exclamation text-danger me-2"></i>{{ e.type }}</td>
+                                        <td class="text-secondary">{{ e.description }}</td>
+                                        <td class="text-end pe-3"><span class="badge bg-dark fw-normal rounded-pill px-3">{{ e.action }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="py-4 text-center text-muted">
+                            All your tasks are current. No pending escalations.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-5 py-4 bg-white border-top">
+            <div class="container">
+                <small class="text-muted">© 2026 Performance Management System</small>
+            </div>
+        </footer>
+
+    </div>
+
+</div>
+
+<script>
+    function showSection(sectionId) {
+        // Hide all sections
+        const sections = ['dashboard', 'propose-goal', 'my-goals', 'probation', 'cycles', 'escalations'];
+        sections.forEach(s => {
+            const el = document.getElementById('section-' + s);
+            if (el) el.style.display = 'none';
+        });
+        
+        // Show active section
+        const activeEl = document.getElementById('section-' + sectionId);
+        if (activeEl) activeEl.style.display = 'block';
+        
+        // Update active class in sidebar links
+        const links = document.querySelectorAll('.sidebar .nav-link');
+        links.forEach(link => {
+            link.classList.remove('active');
+        });
+        
+        // Find active link
+        const activeLink = document.querySelector(`.sidebar a[href="#${sectionId}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+        }
+        
+        // Update top header title
+        const titles = {
+            'dashboard': 'Dashboard Overview',
+            'propose-goal': 'Propose Goal',
+            'my-goals': 'My Goals & Feedback',
+            'probation': 'Probation Review',
+            'cycles': 'Cycle Reviews',
+            'escalations': 'Escalation Alerts'
+        };
+        document.getElementById('section-title').textContent = titles[sectionId] || 'Dashboard Overview';
+        
+        // Update URL hash
+        window.location.hash = sectionId;
+    }
+
+    // On page load, show section based on URL hash or default to dashboard
+    window.addEventListener('load', () => {
+        let hash = window.location.hash.substring(1);
+        if (!['dashboard', 'propose-goal', 'my-goals', 'probation', 'cycles', 'escalations'].includes(hash)) {
+            hash = 'dashboard';
+        }
+        showSection(hash);
+    });
+</script>
+
+<!-- Initialize Charts -->
+<script>
+    // 1. Goal Progress Chart (Bar chart)
+    const goalLabels = [
+        {% for g in goals %}
+            "{{ g[2] }}",
+        {% endfor %}
+    ];
+    
+    const goalProgress = [
+        {% for g in goals %}
+            {{ g[7] }},
+        {% endfor %}
+    ];
+
+    const ctx1 = document.getElementById('goalProgressChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: goalLabels,
+            datasets: [{
+                label: 'Progress (%)',
+                data: goalProgress,
+                backgroundColor: '#10b981',
+                borderRadius: 6,
+                borderSkipped: false,
+                barThickness: 28
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    padding: 12,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    grid: {
+                        color: '#f1f5f9'
+                    },
+                    border: {
+                        dash: [4, 4]
+                    },
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 11 }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 10 }
+                    }
+                }
+            }
+        }
+    });
+
+    // 2. Goal Weight Distribution Chart (Doughnut)
+    const assignedWeight = {{ total_weight }};
+    const remainingWeight = Math.max(0, 100 - assignedWeight);
+
+    const ctx2 = document.getElementById('weightStatusChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: ['Assigned Goal Weight', 'Available Weight'],
+            datasets: [{
+                data: [assignedWeight, remainingWeight],
+                backgroundColor: ['#10b981', '#e2e8f0'],
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15,
+                        color: '#64748b',
+                        font: { size: 12, weight: '500' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    padding: 10
+                }
+            },
+            cutout: '70%'
+        }
+    });
+</script>
+
+<script>
+    document.querySelectorAll('.dynamic-pb').forEach(bar => {
+        bar.style.width = bar.getAttribute('aria-valuenow') + '%';
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

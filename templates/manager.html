@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manager Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='custom.css') }}" rel="stylesheet">
+
+    <!-- Chart.js for beautiful analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #0f172a;
+        }
+        .table td, .table th {
+            vertical-align: middle;
+        }
+        .table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #0d0f12 !important;
+            border-right: 1px solid #1f2937;
+            position: fixed;
+            height: 100vh;
+            z-index: 1000;
+        }
+        .sidebar .nav-link {
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 10px 16px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+        .sidebar .nav-link:hover {
+            color: #f1f5f9 !important;
+            background-color: #1e293b !important;
+        }
+        .sidebar .nav-link.active {
+            color: #ffffff !important;
+            background: #1e293b !important;
+            border-left: 3px solid #0ea5e9;
+            border-radius: 4px 8px 8px 4px;
+            font-weight: 600;
+        }
+        .sidebar .nav-link.active i {
+            color: #0ea5e9 !important;
+        }
+        .main-content {
+            margin-left: 250px;
+            background-color: #f8fafc;
+            min-height: 100vh;
+        }
+        .card {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+        }
+        .dashboard-section {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="d-flex" style="min-height: 100vh;">
+    
+    <!-- ================= SIDEBAR ================= -->
+    <div class="sidebar d-flex flex-column justify-content-between text-white">
+        <div class="d-flex flex-column">
+            <!-- Sidebar Header -->
+            <div class="sidebar-header d-flex align-items-center p-4" style="border-bottom: 1px solid #1f2937;">
+                <img src="{{ url_for('static', filename='img1.jpg') }}" alt="PMS Logo" width="40" height="40" class="me-3 rounded bg-white p-1 shadow-sm">
+                <div>
+                    <div class="fw-bold" style="font-size: 16px; letter-spacing: 0.5px;">PMS</div>
+                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Manager Console</div>
+                </div>
+            </div>
+            
+            <!-- Navigation Links -->
+            <ul class="nav flex-column p-3 gap-1">
+                <li class="nav-item">
+                    <a href="#dashboard" class="nav-link active d-flex align-items-center" onclick="showSection('dashboard'); event.preventDefault();">
+                        <i class="fa-solid fa-chart-pie me-3" style="width: 20px;"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#assign-goal" class="nav-link d-flex align-items-center" onclick="showSection('assign-goal'); event.preventDefault();">
+                        <i class="fa-solid fa-plus-circle me-3" style="width: 20px;"></i> Assign Goal
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#pending-goals" class="nav-link d-flex align-items-center" onclick="showSection('pending-goals'); event.preventDefault();">
+                        <i class="fa-solid fa-clipboard-check me-3" style="width: 20px;"></i> Pending Approvals
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#active-goals" class="nav-link d-flex align-items-center" onclick="showSection('active-goals'); event.preventDefault();">
+                        <i class="fa-solid fa-bullseye me-3" style="width: 20px;"></i> Active Team Goals
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#probation" class="nav-link d-flex align-items-center" onclick="showSection('probation'); event.preventDefault();">
+                        <i class="fa-solid fa-user-clock me-3" style="width: 20px;"></i> Probation Reviews
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#review-cycles" class="nav-link d-flex align-items-center" onclick="showSection('review-cycles'); event.preventDefault();">
+                        <i class="fa-solid fa-arrows-rotate me-3" style="width: 20px;"></i> Review Cycles
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#escalations" class="nav-link d-flex align-items-center" onclick="showSection('escalations'); event.preventDefault();">
+                        <i class="fa-solid fa-triangle-exclamation me-3" style="width: 20px;"></i> Escalated Items
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer p-3" style="border-top: 1px solid #1f2937;">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="avatar d-flex align-items-center justify-content-center text-white fw-bold bg-info rounded-circle" style="width: 38px; height: 38px; font-size: 14px;">
+                        {{ session['name'][0]|upper if session['name'] else 'M' }}
+                    </div>
+                    <div style="line-height: 1.2;">
+                        <div class="fw-semibold text-white" style="font-size: 13px;">{{ session['name'] or 'Manager' }}</div>
+                        <div class="text-muted" style="font-size: 11px;">{{ session['email'] or 'mgr@gmail.com' }}</div>
+                    </div>
+                </div>
+                <a href="/logout" class="text-danger p-2" title="Logout">
+                    <i class="fa-solid fa-right-from-bracket" style="font-size: 16px;"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MAIN CONTENT ================= -->
+    <div class="main-content flex-grow-1">
+        
+        <!-- Top Nav Header -->
+        <div class="top-nav d-flex align-items-center justify-content-between px-4 py-3 bg-white border-bottom" style="height: 70px;">
+            <div>
+                <span class="text-muted small text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Manager Console</span>
+                <h4 class="fw-bold mb-0 text-dark" id="section-title">Dashboard Overview</h4>
+            </div>
+            
+            <div class="d-flex align-items-center gap-3">
+                <!-- Search bar -->
+                <div class="input-group" style="width: 280px;">
+                    <span class="input-group-text bg-light border-0" id="search-addon" style="border-radius: 8px 0 0 8px;"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" class="form-control bg-light border-0" placeholder="Search employees, goals..." aria-describedby="search-addon" style="border-radius: 0 8px 8px 0; font-size: 14px; padding: 8px 12px;">
+                </div>
+                
+                <!-- Notifications Bell -->
+                <div class="dropdown">
+                    <a href="#" class="btn bg-light position-relative shadow-sm" data-bs-toggle="dropdown" aria-expanded="false" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                        <i class="fa-regular fa-bell" style="font-size: 16px;"></i>
+                        {% if notifications %}
+                        <span class="position-absolute top-0 start-100 translate-middle p-1.5 bg-danger border border-white rounded-circle" style="margin-top: 4px; margin-left: -4px;"></span>
+                        {% endif %}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2 p-0" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header bg-light border-bottom text-dark fw-bold py-2">
+                            <i class="fa-solid fa-envelope-open-text text-primary me-2"></i> Recent Email Alerts
+                        </li>
+                        {% if notifications %}
+                            {% for n in notifications %}
+                            <li class="border-bottom">
+                                <span class="dropdown-item text-wrap py-3" style="font-size: 13px; cursor: default;">
+                                    <div class="fw-bold text-dark mb-1">{{ n[4] }}</div>
+                                    <div class="text-muted small"><i class="fa-regular fa-clock me-1"></i> {{ n[6][:10] }} {{ n[6][11:16] }}</div>
+                                </span>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <li><span class="dropdown-item text-muted small py-4 text-center">No new notifications.</span></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Content Container -->
+        <div class="p-4">
+
+            <!-- ================= SECTION: DASHBOARD (OVERVIEW) ================= -->
+            <div id="section-dashboard" class="dashboard-section" style="display: block;">
+                <!-- Stats Row -->
+                <div class="row g-3 mb-4">
+                    <!-- Team Size -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Team size</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #eff6ff; border-radius: 6px; color: #3b82f6; font-size: 13px;">
+                                    <i class="fa-solid fa-users"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold mb-1 text-dark">{{ team_employees|length }}</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Active Goals -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Active team goals</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #f0fdf4; border-radius: 6px; color: #22c55e; font-size: 13px;">
+                                    <i class="fa-solid fa-bullseye"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold mb-1 text-dark">{{ active_goals|length }}</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Pending Approvals -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Pending Approvals</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #fffbeb; border-radius: 6px; color: #f59e0b; font-size: 13px;">
+                                    <i class="fa-solid fa-clock"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold mb-1 text-dark">{{ pending_goals|length }}</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Overdue Escalated reviews -->
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm p-3 bg-white" style="height: 100%;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted fw-semibold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Escalations</span>
+                                <div class="stat-icon d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; background-color: #fff5f5; border-radius: 6px; color: #ef4444; font-size: 13px;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold mb-1 text-dark">{{ escalations|length }}</h3>
+                            <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-arrow-pointer me-1"></i> Live snapshot</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row g-3 mb-4">
+                    <!-- Team Goal Progress Chart -->
+                    <div class="col-md-8">
+                        <div class="card border-0 shadow-sm p-4 bg-white" style="height: 420px;">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div>
+                                    <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">Goal Progress Distribution</h5>
+                                    <span class="text-muted" style="font-size: 12px;">Progress percentages of active goals</span>
+                                </div>
+                            </div>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="teamProgressChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Goal Status Distribution -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm p-4 bg-white" style="height: 420px;">
+                            <h5 class="fw-bold mb-1 text-dark" style="font-size: 16px;">Goal Status</h5>
+                            <span class="text-muted d-block mb-3" style="font-size: 12px;">Distribution of team goals</span>
+                            <div style="position: relative; height: 260px; width: 100%;" class="d-flex align-items-center justify-content-center">
+                                <canvas id="goalStatusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Escalations preview -->
+                <div class="card border-0 shadow-sm p-4 bg-white">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">
+                            <i class="fa-solid fa-triangle-exclamation text-warning me-2"></i> Escalated Items Preview <span class="text-muted fw-normal" style="font-size: 14px;">({{ escalations|length }} pending)</span>
+                        </h5>
+                        <a href="#escalations" class="text-primary fw-bold text-decoration-none small" onclick="showSection('escalations')">View all <i class="fa-solid fa-angle-right ms-1"></i></a>
+                    </div>
+                    
+                    {% if escalations %}
+                    <div class="list-group list-group-flush">
+                        {% for e in escalations %}
+                        <div class="list-group-item px-0 py-3 d-flex align-items-center justify-content-between border-bottom border-light">
+                            <div class="d-flex align-items-center">
+                                <div class="dot me-3" style="width: 8px; height: 8px; border-radius: 50%; background-color: #f59e0b;"></div>
+                                <div>
+                                    <div class="fw-bold text-dark" style="font-size: 14px;">{{ e.type }} - {{ e.employee_name }}</div>
+                                    <div class="text-muted" style="font-size: 12px;">{{ e.description }}</div>
+                                </div>
+                            </div>
+                            <span class="badge bg-dark rounded-pill px-3">{{ e.action }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="py-4 text-center text-muted small">
+                        No escalated items pending review.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ================= SECTION: ASSIGN GOAL ================= -->
+            <div id="section-assign-goal" class="dashboard-section">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5 class="mb-3 fw-bold"><i class="fa-solid fa-plus-circle text-primary me-2"></i> Assign Goal to Team Member</h5>
+                        <form method="POST" action="/assign_goal" class="bg-light p-4 border rounded">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Employee</label>
+                                    <select name="employee_id" class="form-select" required>
+                                        <option value="" disabled selected>Select Employee...</option>
+                                        {% for emp in team_employees %}
+                                            <option value="{{ emp[0] }}">{{ emp[1] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Template Auto-Fill Code</label>
+                                    <input type="text" id="template_code" class="form-control" placeholder="PMS-001 (Optional)">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Goal Title</label>
+                                    <input type="text" id="goal_title" name="title" class="form-control" placeholder="e.g. Q1 Logistics" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Weight (%)</label>
+                                    <input type="number" name="weightage" class="form-control" placeholder="20" required min="1" max="100">
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label fw-bold">Description</label>
+                                    <textarea id="goal_desc" name="description" class="form-control" rows="3" placeholder="Deliverables..." required></textarea>
+                                </div>
+                                <div class="col-md-12 text-end mt-4">
+                                    <button class="btn btn-primary px-5 fw-bold" style="padding: 10px 24px;">Assign Goal</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: PENDING APPROVALS ================= -->
+            <div id="section-pending-goals" class="dashboard-section">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body p-0">
+                        <div class="px-4 py-3 border-bottom">
+                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-clipboard-check text-primary me-2"></i> Pending Goal Approvals</h5>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 20%">Employee</th>
+                                        <th style="width: 35%">Goal Details</th>
+                                        <th style="width: 15%">Weight</th>
+                                        <th style="width: 30%">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for goal in pending_goals %}
+                                    <tr>
+                                        <td class="fw-bold text-dark">{{ goal[11] }}</td>
+                                        <td>
+                                            <div class="fw-bold text-dark">{{ goal[1] }}</div>
+                                            <small class="text-muted">{{ goal[2] }}</small>
+                                        </td>
+                                        <td class="fw-bold">{{ goal[6] }}%</td>
+                                        <td>
+                                            <div class="d-flex flex-column gap-2">
+                                                <a href="/approve_goal/{{ goal[0] }}" class="btn btn-sm btn-success fw-bold">Approve</a>
+                                                <form method="POST" action="/reject_goal/{{ goal[0] }}">
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" name="reason" class="form-control" placeholder="Reason..." required>
+                                                        <button class="btn btn-danger fw-bold" type="submit">Reject</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-5">
+                                            <h6 class="mb-0">No pending goals await your approval.</h6>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: ACTIVE TEAM GOALS ================= -->
+            <div id="section-active-goals" class="dashboard-section">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body p-0">
+                        <div class="px-4 py-3 border-bottom">
+                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-bullseye text-primary me-2"></i> Active Team Goals</h5>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 20%">Employee</th>
+                                        <th style="width: 25%">Goal Details</th>
+                                        <th style="width: 20%">Progress</th>
+                                        <th style="width: 35%">Manager Feedback & Scoring</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for goal in active_goals %}
+                                    <tr>
+                                        <td class="fw-bold text-dark">{{ goal[11] }}</td>
+                                        <td>
+                                            <div class="fw-bold text-dark">{{ goal[1] }}</div>
+                                            <small class="text-muted d-block mt-1">{{ goal[2] }}</small>
+                                            <small class="text-muted d-block mt-1"><span class="fw-bold">Weight:</span> {{ goal[6] }}%</small>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="badge bg-success">Active</span>
+                                                <span class="fw-bold text-dark">{{ goal[7] }}%</span>
+                                            </div>
+                                            <div class="progress" style="height: 6px;">
+                                                <div class="progress-bar bg-success dynamic-pb" role="progressbar" aria-valuenow="{{ goal[7] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <!-- Previous Feedback -->
+                                            <div class="mb-2">
+                                                {% set ns = namespace(found=false) %}
+                                                {% for f in feedback %}
+                                                    {% if f[3] == goal[0] %}
+                                                        {% set ns.found = true %}
+                                                        <div class="p-2 bg-light rounded border mb-2">
+                                                            <div class="mb-1" style="line-height: 1;">
+                                                                {% for i in range(1, 6) %}
+                                                                    {% if f[4] >= i %}
+                                                                        <span style="color: #f59e0b; font-size: 14px;">★</span>
+                                                                    {% else %}
+                                                                        <span style="color: #cbd5e1; font-size: 14px;">★</span>
+                                                                    {% endif %}
+                                                                {% endfor %}
+                                                            </div>
+                                                            <small class="text-dark d-block">{{ f[5] }}</small>
+                                                        </div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {% if not ns.found %}
+                                                    <span class="text-muted small">No feedback given yet.</span>
+                                                {% endif %}
+                                            </div>
+
+                                            <!-- Add Feedback Form -->
+                                            <form method="POST" action="/manager_feedback/{{ goal[0] }}" class="bg-white p-3 border rounded shadow-sm mt-3">
+                                                <h6 class="mb-2 fw-bold text-dark" style="font-size: 14px;">Post Manager Feedback</h6>
+                                                <div class="d-flex gap-2">
+                                                    <select name="rating" class="form-select" style="width: 90px;" required>
+                                                        <option value="5">5 ★</option>
+                                                        <option value="4">4 ★</option>
+                                                        <option value="3">3 ★</option>
+                                                        <option value="2">2 ★</option>
+                                                        <option value="1">1 ★</option>
+                                                    </select>
+                                                    <div class="input-group">
+                                                        <input type="text" name="comment" class="form-control" placeholder="Write feedback..." required>
+                                                        <button class="btn btn-primary fw-bold" type="submit">Post</button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-5">
+                                            <h6 class="mb-0">No active goals found for your team.</h6>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: PROBATION ================= -->
+            <div id="section-probation" class="dashboard-section">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-3"><i class="fa-solid fa-user-clock text-primary me-2"></i> Probation Reviews</h5>
+
+                        {% for p in probation_reviews %}
+                        <div class="card mb-3 border border-light-subtle shadow-sm">
+                            <div class="card-body p-3">
+                                <p class="mb-1 text-dark"><b>Employee:</b> {{ p[8] }}</p>
+                                <p class="mb-3 text-secondary small"><b>Stage:</b> Day {{ p[2] }}</p>
+
+                                {% if p[9] == true %}
+                                <!-- Review Submissions side-by-side -->
+                                <div class="row g-3 mt-1">
+                                    <!-- Employee Table -->
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-secondary mb-2">Employee Feedback</h6>
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Comfort</th><td>{{ p[3].comfort }}</td></tr>
+                                                <tr><th>Clarity</th><td>{{ p[3].clarity }}</td></tr>
+                                                <tr><th>Challenges</th><td>{{ p[3].challenges }}</td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Manager Table -->
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-primary mb-2">Manager Feedback</h6>
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Understanding</th><td>{{ p[4].understanding }}</td></tr>
+                                                <tr><th>Performance</th><td>{{ p[4].performance }}</td></tr>
+                                                <tr><th>Concerns</th><td>{{ p[4].concerns }}</td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {% elif p[5] == 1 %}
+                                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i> Employee submitted, waiting for manager review</span>
+                                {% else %}
+                                    <span class="badge bg-secondary"><i class="fa-solid fa-circle-exclamation me-1"></i> Waiting for employee self submission</span>
+                                {% endif %}
+
+                                <!-- manager review form -->
+                                {% if p[6] == 0 %}
+                                <form method="POST" action="/submit_manager_review/{{ p[0] }}" class="bg-light p-3 border rounded mt-3">
+                                    <h6 class="fw-bold mb-3">Post Manager Evaluation</h6>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Understanding of role</label>
+                                        <select name="understanding" class="form-select" required>
+                                            <option value="" disabled selected>Select option</option>
+                                            <option>Clear</option>
+                                            <option>Moderate</option>
+                                            <option>Poor</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Performance rating</label>
+                                        <select name="performance" class="form-select" required>
+                                            <option value="" disabled selected>Select option</option>
+                                            <option>Good</option>
+                                            <option>Average</option>
+                                            <option>Poor</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Concerns</label>
+                                        <textarea name="concerns" class="form-control" rows="2" placeholder="Detail any team concerns..." required></textarea>
+                                    </div>
+
+                                    <button class="btn btn-primary fw-bold px-4">Submit Evaluation</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: REVIEW CYCLES ================= -->
+            <div id="section-review-cycles" class="dashboard-section">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-3"><i class="fa-solid fa-arrows-rotate text-primary me-2"></i> Review Cycles</h5>
+
+                        {% for c in cycles %}
+                        <div class="card mb-3 border border-light-subtle shadow-sm">
+                            <div class="card-body p-3">
+                                <p class="mb-1 text-dark"><b>Employee:</b> {{ c[11] }}</p>
+                                <p class="mb-3 text-secondary small"><b>Cycle:</b> {{ c[3] }}</p>
+
+                                {% if c[12] == true %}
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-secondary mb-2">Employee Review</h6>
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Rating</th><td><span class="badge bg-secondary">{{ c[8].rating }}</span></td></tr>
+                                                <tr><th>Achievements</th><td>{{ c[8].achievements }}</td></tr>
+                                                <tr><th>Challenges</th><td>{{ c[8].challenges }}</td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-light p-3 rounded border">
+                                            <h6 class="fw-bold text-primary mb-2">Manager Review</h6>
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <tr><th style="width:40%">Rating</th><td><span class="badge bg-primary">{{ c[9].rating }}</span></td></tr>
+                                                <tr><th>Comment</th><td>{{ c[9].comment }}</td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% elif c[6] == 1 %}
+                                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i> Waiting for manager cycle review submission</span>
+                                {% else %}
+                                    <span class="badge bg-secondary"><i class="fa-solid fa-circle-exclamation me-1"></i> Waiting for employee self-review</span>
+                                {% endif %}
+
+                                {% if c[7] == 0 %}
+                                <form method="POST" action="/submit_cycle_manager/{{ c[0] }}" class="bg-light p-3 border rounded mt-3">
+                                    <h6 class="fw-bold mb-3">Manager Evaluation</h6>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Manager Rating</label>
+                                        <select name="rating" class="form-select" required>
+                                            <option value="" disabled selected>Select rating</option>
+                                            <option>Above Expectations</option>
+                                            <option>Meets Expectations</option>
+                                            <option>Below Expectations</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Evaluation Comment</label>
+                                        <textarea name="comment" class="form-control" rows="2" placeholder="Write feedback..." required></textarea>
+                                    </div>
+
+                                    <button class="btn btn-primary fw-bold px-4">Submit Cycle Review</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: ESCALATIONS ================= -->
+            <div id="section-escalations" class="dashboard-section">
+                <div class="card shadow-sm border border-start border-warning border-4">
+                    <div class="card-body p-4 bg-white rounded-3">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="text-warning me-3"><i class="fa-solid fa-triangle-exclamation fa-2x"></i></div>
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark">ACTION REQUIRED: ESCALATED ITEMS ({{ escalations|length }})</h5>
+                                <p class="text-muted small mb-0">The following items require your immediate managerial review.</p>
+                            </div>
+                        </div>
+
+                        {% if escalations %}
+                        <div class="table-responsive rounded border mt-3">
+                            <table class="table table-hover mb-0 bg-white align-middle small">
+                                <thead class="table-light text-muted">
+                                    <tr>
+                                        <th class="fw-semibold border-0 py-3 ps-3">Type</th>
+                                        <th class="fw-semibold border-0 py-3">Employee</th>
+                                        <th class="fw-semibold border-0 py-3">Issue Description</th>
+                                        <th class="fw-semibold border-0 py-3 pe-3 text-end">Action Recommended</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for e in escalations %}
+                                    <tr>
+                                        <td class="fw-bold text-dark ps-3"><i class="fa-solid fa-circle-exclamation text-warning me-2"></i>{{ e.type }}</td>
+                                        <td>{{ e.employee_name }}</td>
+                                        <td class="text-secondary">{{ e.description }}</td>
+                                        <td class="text-end pe-3"><span class="badge bg-dark fw-normal rounded-pill px-3">{{ e.action }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="py-4 text-center text-muted">
+                            No escalated items pending.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-5 py-4 bg-white border-top">
+            <div class="container">
+                <small class="text-muted">© 2026 Performance Management System</small>
+            </div>
+        </footer>
+
+    </div>
+
+</div>
+
+<script>
+    function showSection(sectionId) {
+        // Hide all sections
+        const sections = ['dashboard', 'assign-goal', 'pending-goals', 'active-goals', 'probation', 'review-cycles', 'escalations'];
+        sections.forEach(s => {
+            const el = document.getElementById('section-' + s);
+            if (el) el.style.display = 'none';
+        });
+        
+        // Show active section
+        const activeEl = document.getElementById('section-' + sectionId);
+        if (activeEl) activeEl.style.display = 'block';
+        
+        // Update active class in sidebar links
+        const links = document.querySelectorAll('.sidebar .nav-link');
+        links.forEach(link => {
+            link.classList.remove('active');
+        });
+        
+        // Find active link
+        const activeLink = document.querySelector(`.sidebar a[href="#${sectionId}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+        }
+        
+        // Update top header title
+        const titles = {
+            'dashboard': 'Dashboard Overview',
+            'assign-goal': 'Assign Goal',
+            'pending-goals': 'Pending Approvals',
+            'active-goals': 'Active Team Goals',
+            'probation': 'Probation Reviews',
+            'review-cycles': 'Review Cycles',
+            'escalations': 'Escalated Items'
+        };
+        document.getElementById('section-title').textContent = titles[sectionId] || 'Dashboard Overview';
+        
+        // Update URL hash
+        window.location.hash = sectionId;
+    }
+
+    // On page load, show section based on URL hash or default to dashboard
+    window.addEventListener('load', () => {
+        let hash = window.location.hash.substring(1);
+        if (!['dashboard', 'assign-goal', 'pending-goals', 'active-goals', 'probation', 'review-cycles', 'escalations'].includes(hash)) {
+            hash = 'dashboard';
+        }
+        showSection(hash);
+    });
+</script>
+
+<!-- Autocomplete for template code -->
+<script>
+document.getElementById('template_code').addEventListener('input', function() {
+    let code = this.value.trim();
+    if(code.length >= 7) {
+        fetch('/api/goal/' + code)
+        .then(response => response.json())
+        .then(data => {
+            if(data.found) {
+                document.getElementById('goal_title').value = data.title;
+                document.getElementById('goal_desc').value = data.description;
+                this.classList.add('is-valid');
+                this.style.borderColor = "green";
+            } else {
+                this.classList.remove('is-valid');
+                this.style.borderColor = "";
+            }
+        }).catch(err => console.log(err));
+    } else {
+        this.classList.remove('is-valid');
+        this.style.borderColor = "";
+    }
+});
+</script>
+
+<!-- Initialize Charts -->
+<script>
+    // 1. Team Progress Chart (Active goals progress percentages)
+    const goalLabels = [
+        {% for goal in active_goals %}
+            "{{ goal[1] }} ({{ goal[11] }})",
+        {% endfor %}
+    ];
+    
+    const goalProgress = [
+        {% for goal in active_goals %}
+            {{ goal[7] }},
+        {% endfor %}
+    ];
+
+    const ctx1 = document.getElementById('teamProgressChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: goalLabels,
+            datasets: [{
+                label: 'Progress (%)',
+                data: goalProgress,
+                backgroundColor: '#0ea5e9',
+                borderRadius: 6,
+                borderSkipped: false,
+                barThickness: 28
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    padding: 12,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    grid: {
+                        color: '#f1f5f9'
+                    },
+                    border: {
+                        dash: [4, 4]
+                    },
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 11 }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 10 }
+                    }
+                }
+            }
+        }
+    });
+
+    // 2. Goal Status Chart (Doughnut)
+    const activeCount = {{ active_goals|length }};
+    const pendingCount = {{ pending_goals|length }};
+
+    const ctx2 = document.getElementById('goalStatusChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: ['Active', 'Pending Approval'],
+            datasets: [{
+                data: [activeCount, pendingCount],
+                backgroundColor: ['#22c55e', '#f59e0b'],
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15,
+                        color: '#64748b',
+                        font: { size: 12, weight: '500' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    padding: 10
+                }
+            },
+            cutout: '70%'
+        }
+    });
+</script>
+
+<script>
+    document.querySelectorAll('.dynamic-pb').forEach(bar => {
+        bar.style.width = bar.getAttribute('aria-valuenow') + '%';
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
